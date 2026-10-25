@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { stripe } from '../../../lib/stripe'
 import prismadb from '../../../lib/prismadb'
+import { getSubscriptionPeriodEnd, getInvoiceSubscription } from './stripeSubscriptionPeriod';
 
 export async function POST(req:Request){
     // getting the body which will further be used for webhook signature verification  and construction of event 
@@ -49,7 +50,7 @@ export async function POST(req:Request){
             stripeCustomerId:subscription.customer as string,
             stripePriceId:subscription.items.data[0].price.id,
             stripeCurrentPeriodEnd:new Date(
-                subscription.current_period_end*1000
+                (getSubscriptionPeriodEnd(subscription, (items) => items[0]))*1000
             )
           }  
         })
@@ -58,7 +59,7 @@ export async function POST(req:Request){
     // case2-user already subscribed he just wanted to renew/update the subscription
     if(event.type === 'invoice.payment_succeeded'){
         const subscription=await stripe.subscriptions.retrieve(
-            session.subscription as string
+            (getInvoiceSubscription(session)) as string
         )
 
         await prismadb.userSubscription.update({
@@ -68,7 +69,7 @@ export async function POST(req:Request){
         data:{
             stripePriceId:subscription.items.data[0].price.id,
             stripeCurrentPeriodEnd:new Date(
-                subscription.current_period_end*1000
+                (getSubscriptionPeriodEnd(subscription, (items) => items[0]))*1000
             ),
         }
         })
